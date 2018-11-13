@@ -23,6 +23,7 @@ class TileBar extends Component {
 			newTileObj('conditional', w12, 5 * w12),
 			newTileObj('end'        , w12, 7 * w12),
 		];
+		this.tileObjs.forEach(tile => tile.proto = true);
 	}
 	
 	render() {

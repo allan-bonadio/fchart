@@ -58,18 +58,21 @@ class beginTileObj extends tileObj {
 	}
 
 	render(mouseDownEvt) {
+		let arrows = null;
+		if (! this.proto)
+			arrows = <Arrow arrowObj={this.outlets[0]} />;
 		return <>
 			<ellipse cx={w12} cy={h12} 
 					rx={w12} ry={h12}
 					onMouseDown={mouseDownEvt}  />
-			<Arrow arrowObj={this.outlets[0]} />
+			{arrows}
 		</>;
 	}
 	
-	getOutletLoc(outletNum) {
-		if (outletNum != 0)
-			throw "bad outletNum for tile outlet";
-		return [this.x + w1, this.y + h12];
+	getOutletLoc(outlet) {
+		if (outlet != 0)
+			throw "bad outlet for begin tile";
+		return [this.x + w12, this.y];
 	}
 }
 
@@ -80,15 +83,13 @@ class endTileObj extends tileObj {
 	}
 
 	render(mouseDownEvt) {
-		return <>
-			<ellipse cx={w12} cy={h12} 
-					rx={w12} ry={h12}
-					onMouseDown={mouseDownEvt}  />
-		</>;
+		return <ellipse cx={w12} cy={h12} 
+			rx={w12} ry={h12}
+			onMouseDown={mouseDownEvt}  />
 	}
 	
 	getInletLoc(inletNum) {
-		return [this.x, this.y + h12];
+		return [this.x, this.y - h12];
 	}
 }
 
@@ -99,21 +100,24 @@ class statementTileObj extends tileObj {
 	}
 
 	render(mouseDownEvt) {
+		let arrows = null;
+		if (! this.proto)
+			arrows = <Arrow arrowObj={this.outlets[0]} />;
 		return <>
 			<rect x='0' y='0' width={config.tileWidth} height={config.tileHeight} 
 					onMouseDown={mouseDownEvt}  />
-			<Arrow arrowObj={this.outlets[0]} />
+			{arrows}
 		</>;
 	}
 	
 	getInletLoc(inletNum) {
-		return [this.x, this.y + h12];
+		return [this.x, this.y - h12];
 	}
 	
 	getOutletLoc(outletNum) {
 		if (outletNum != 0)
-			throw "bad outletNum for tile outlet";
-		return [this.x + w1, this.y + h12];
+			throw "bad outlet for stmt tile";
+		return [this.x, this.y + h12];
 	}
 }
 
@@ -125,22 +129,28 @@ class conditionalTileObj extends tileObj {
 
 	render(mouseDownEvt) {
 		let corners = `0,${h12} ${w12},0 ${w1},${h12} ${w12},${h1}`;
+		let arrows = null;
+		if (! this.proto) {
+			arrows = <>
+				<Arrow arrowObj={this.outlets[0]} />
+				<Arrow arrowObj={this.outlets[1]} />
+			</>;
+		}
 		return <>
 			<polygon points={corners} 
 					onMouseDown={mouseDownEvt} />
-			<Arrow arrowObj={this.outlets[0]} />
-			<Arrow arrowObj={this.outlets[1]} />
+			{arrows}
 		</>;
 	}
 
 	getInletLoc(inletNum) {
-		return [this.x + w12, this.y];	
+		return [this.x + w12, this.y - h12];	
 	}
 	
 	getOutletLoc(outletNum) {
 		if (outletNum < 0 || outletNum >= 2)
-			throw "bad outletNum for tile outlet";
-		return [this.x + outletNum * w1, this.y + h12];
+			throw "bad outlet for conditional tile";
+		return [this.x + outletNum * w1, this.y];
 	}
 }
 
@@ -161,8 +171,8 @@ class Tile extends Component {
 	
 	
 	render() {
-console.info("render tile");////
 		let p = this.props;
+		console.info("render tile %s %o", p.tileObj.proto ? 'proto' : '', p.tileObj);////
 		let tob = p.tileObj;
 		let x = p.x || tob.x;
 		let y = p.y || tob.y;

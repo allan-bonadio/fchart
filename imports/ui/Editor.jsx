@@ -16,15 +16,15 @@ class Editor extends Component {
 		this.state = {
 			tiles: [
 				// just for testing
-				a = newTileObj('begin', 100, 100), 
-				newTileObj('conditional', 300, 100), 
-				b = newTileObj('statement', 100, 300), 
-				newTileObj('end', 200, 300),
+				a = newTileObj('begin', 200, 100), 
+				newTileObj('conditional', 400, 100), 
+				b = newTileObj('statement', 200, 300), 
+				newTileObj('end', 300, 300),
 			],
-			arrows: [
-				// test data
-				new arrowObj(a, 0, b, 0),
-			],
+////			arrows: [
+////				// test data
+////				new arrowObj(a, 0, b, 0),
+////			],
 			
 			// non-null iff dragging
 			sourceTileObj: null,  // where the mousedown was, won't move during drag
@@ -50,9 +50,6 @@ console.info("render edit start");////
 				mouseDownCallback={this.mouseDownCallback} key={tileObj.tileSerial} />
 		);
 		let src = this.state.sourceTileObj;
-		let arrowComps = this.state.arrows.map(arrowObj =>
-			<Arrow arrowObj={arrowObj} />
-		);
 		
 		return <svg id='editor' width={config.editorWidth} height={config.editorHeight} 
 					onMouseMove={this.mouseMoveEvt} onMouseUp={this.mouseUpEvt} onMouseLeave={this.mouseLeaveEvt}>
@@ -109,12 +106,12 @@ console.info("render edit start");////
 		let tileObj = st;
 		if (this.state.proto) {
 			// it's from the TileBar!  make a new one
-			tileObj = newTileObj(st.type, s.ghostX - config.tileBarWidth, s.ghostY, true);
+			tileObj = newTileObj(st.type, s.ghostX, s.ghostY, true);
 			newTiles.push(tileObj);
 		}
 		else {
 			// an existing one
-			tileObj.x = s.ghostX - config.tileBarWidth;
+			tileObj.x = s.ghostX;
 			tileObj.y = s.ghostY;
 		}
 		

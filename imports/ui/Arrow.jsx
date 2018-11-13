@@ -1,5 +1,8 @@
-// the toolbar on the left with prototype Arrows in it, 
-// for the user to drag and drop onto the Flowchart
+// arrows connecting outlets of one tile to inlets of others
+// or stubs, if it's not connected yet
+// Arrows are drawn with their source tiles.
+// arrowObjs are children of their source tileObjs, in .outlets[]
+// and they have refs to their outlet/src tileObjs and inlet/dest tileObjs
 
 import React, { Component } from 'react';
 
@@ -15,20 +18,20 @@ export class arrowObj {
 	// create the info needed for an arrow component, from 'src' tile
 	// initially unattached.  direction = [dx, dy]
 	// [1,0]=right, [0, 1] means Bottom, [-1,0]=left
-	constructor(fromTileObj, fromOutlet, direction) {
+	constructor(fromTileObj, fromTileOutlet, direction) {
 		// arrow starts from the outlet of the 'from' tile
 		this.fromTileObj = fromTileObj;
-		this.fromTileOutlet = fromOutlet;
+		this.fromTileOutlet = fromTileOutlet;
 		this.direction = direction;
 	
 		this.toTileObj = null;
-		this.toInlet = -1;
+		this.toTileInlet = -1;
 	}
 	
 	// attach arrowhead end to tile obj
-	attach( toTileObj, toInlet) {
+	attach( toTileObj, toTileInlet) {
 		this.toTileObj = toTileObj;
-		this.toInlet = toInlet;
+		this.toTileInlet = toTileInlet;
 	}
 }
 
@@ -49,8 +52,9 @@ class Arrow extends Component {
 		let ao = this.props.arrowObj;
 		let fromTileObj = ao.fromTileObj;
 		let toTile = ao.toTile || null;
-		let start = fromTileObj.getOutletLoc(ao.fromOutlet);
-		let end = [fromTileObj.x + ao.direction[0] * 5, fromTileObj.y + ao.direction[1] * 5];
+		let start = fromTileObj.getOutletLoc(ao.fromTileOutlet);
+		let end = [start[0] + ao.direction[0] * 5, 
+					start[1] + ao.direction[1] * 5];
 		if (ao.toTile) {
 			end = toTile.getInletLoc(0);
 			end[0] = end[0] + ao.toTile.direction[0];
@@ -58,9 +62,10 @@ class Arrow extends Component {
 		}
 		
 		let path = `M ${coords(start)} L ${coords(end)}`;
-		return <path className='arrow' 
-			d={path}
-			stroke='#666' />;
+		console.log("path=", path);////
+		return <path className='arrow' d={path}
+			stroke='#f08 5px' 
+			marker-end="url(#arrow-head)" />;
 	}
 
 

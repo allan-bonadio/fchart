@@ -9,7 +9,6 @@ const config = {
 	// tiles
 	tileWidth: 80,
 	tileHeight: 40,
-	tileMaxInlets: 3,
 	
 	// arrows.  The direction can be any 360.
 }
