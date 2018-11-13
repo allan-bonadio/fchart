@@ -1,0 +1,44 @@
+body {
+  padding: 0;
+  margin: 0;
+  font-family: sans-serif;
+}
+
+
+/* ------------------------------------------------- editor */
+
+svg#editor {
+	/* position: relative;  so we can get the loc relative to the editor */
+}
+
+/* ------------------------------------------------- tile-bar */
+
+
+
+/* ------------------------------------------------- tiles */
+
+/* this class is only on the tiles in the tile-bar */
+.proto {
+	color: white
+}
+
+#editor g.begin {
+	stroke: #484;
+	fill: #ac4;
+}
+
+#editor g.statement {
+	stroke: #448;
+	fill: #5bd;
+}
+
+#editor g.conditional {
+	stroke: #844;
+	fill: #db6;
+}
+
+#editor g.end {
+	stroke: #844;
+	fill: #d66;
+}
+
