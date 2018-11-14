@@ -26,6 +26,8 @@ export class arrowObj {
 	
 		this.toTileObj = null;
 		this.toTileInlet = -1;
+		
+		// notice this has no coordinates - they all come from the tiles
 	}
 	
 	// attach arrowhead end to tile obj
@@ -51,21 +53,24 @@ class Arrow extends Component {
 	render() {
 		let ao = this.props.arrowObj;
 		let fromTileObj = ao.fromTileObj;
-		let toTile = ao.toTile || null;
+		let toTileObj = ao.toTileObj || null;
 		let start = fromTileObj.getOutletLoc(ao.fromTileOutlet);
-		let end = [start[0] + ao.direction[0] * 5, 
-					start[1] + ao.direction[1] * 5];
-		if (ao.toTile) {
-			end = toTile.getInletLoc(0);
-			end[0] = end[0] + ao.toTile.direction[0];
-			end[1] = end[1] + ao.toTile.direction[1];
+		let end;
+		if (toTileObj) {
+			end = toTileObj.getInletLoc(0);
+			end[0] = end[0] + toTileObj.direction[0];
+			end[1] = end[1] + toTileObj.direction[1];
 		}
-		
+		else {
+			end= [start[0] + ao.direction[0] * 55, 
+					start[1] + ao.direction[1] * 55];
+		}
 		let path = `M ${coords(start)} L ${coords(end)}`;
 		console.log("path=", path);////
-		return <path className='arrow' d={path}
-			stroke='#f08 5px' 
-			marker-end="url(#arrow-head)" />;
+		
+		let key = 'a'+ fromTileObj.tileSerial +'_'+ ao.fromTileOutlet;
+		return <path className='arrow' d={path} key={key} serial={key}
+			marker-end="url(#arrow-head)" style={{visibility: this.props.visibility}} />;
 	}
 
 

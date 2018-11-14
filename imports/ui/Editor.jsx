@@ -6,35 +6,30 @@ import Arrow, {arrowObj} from './Arrow';
 import TileBar from './TileBar';
 import Flowchart from './Flowchart.jsx';
 
+function newDummyGhostTile() {
+	return newTileObj('begin', 0,  0, false);
+}
+
 // the main editing space for constructing a flowchart, including TileBar
 class Editor extends Component {
 	constructor(props) {
 		super(props);
 		Editor.me = this;
 		
-		let a, b;
 		this.state = {
 			tiles: [
 				// just for testing
-				a = newTileObj('begin', 200, 100), 
+				newTileObj('begin', 200, 100), 
 				newTileObj('conditional', 400, 100), 
-				b = newTileObj('statement', 200, 300), 
+				newTileObj('statement', 200, 300), 
 				newTileObj('end', 300, 300),
 			],
-////			arrows: [
-////				// test data
-////				new arrowObj(a, 0, b, 0),
-////			],
 			
 			// non-null iff dragging
 			sourceTileObj: null,  // where the mousedown was, won't move during drag
 			
-			//  invisible unless dragging
-			ghostTileObj: newTileObj('statement', 0, 0, false),
-			
-			// where the ghost is, only while dragging
-			ghostX: 0,
-			ghostY: 0,
+			//  invisible unless dragging; follows the mouse.  Just a dummy when not dragging.
+			ghostTileObj: newDummyGhostTile(),
 		};
 		
 		this.mouseDownCallback = this.mouseDownCallback.bind(this);
@@ -44,7 +39,7 @@ class Editor extends Component {
 	}
 	
 	render() {
-console.info("render edit start");////
+console.info("------------------------------------------------------------- render edit start");////
 		let tileComps = this.state.tiles.map(tileObj => 
 			<Tile tileObj={tileObj} whHare='poiuytfuio'
 				mouseDownCallback={this.mouseDownCallback} key={tileObj.tileSerial} />
@@ -52,32 +47,49 @@ console.info("render edit start");////
 		let src = this.state.sourceTileObj;
 		
 		return <svg id='editor' width={config.editorWidth} height={config.editorHeight} 
-					onMouseMove={this.mouseMoveEvt} onMouseUp={this.mouseUpEvt} onMouseLeave={this.mouseLeaveEvt}>
+					onMouseMove={this.mouseMoveEvt} 
+					onMouseUp={this.mouseUpEvt} 
+					onMouseLeave={this.mouseLeaveEvt}>
+			<defs>
+				<marker id="arrow-head"
+					refX="0" refY="1.5" 
+					markerWidth="4" markerHeight="3"
+					orient="auto">
+					<path d="M 0 0 L 4 1.5 L 0 3 z" stroke='none' fill='black' />
+				</marker>
+			</defs>
 			<TileBar mouseDownCallback={this.mouseDownCallback} />
 			<Flowchart mouseDownCallback={this.mouseDownCallback}>
 				{tileComps}
 			</Flowchart>
-			<Tile tileObj={this.state.ghostTileObj} x={this.state.ghostX} y={this.state.ghostY} ghost
+			<Tile tileObj={this.state.ghostTileObj} ghost
 						mouseDownCallback={this.mouseDownCallback} />
 		</svg>;
 	}
 
 
 	/* ************************************************************ dragging tiles */
+	newGhostObj(srcTileObj, ev, innerX = this.state.innerX, innerY = this.state.innerY) {
+		let nto = newTileObj(srcTileObj.type, 
+				ev.clientX - innerX, 
+				ev.clientY - innerY, true);
+		nto.ghost = true;
+		nto.serial = 'ghost';
+		return nto;
+	}
+	
 	// user has clicked down on a tile (whether in the TileBar or Flowchart)
-	// actually called from clicked tile
-	mouseDownCallback(tileComp, tileObj, ev, innerX, innerY, proto) {
-		if (! proto) {
-			tileObj.visible = false;
+	// actually called from clicked tile.  innerXY are coordinates of clickdown relative to center of tile.
+	mouseDownCallback(tileComp, srcTileObj, ev, innerX, innerY) {
+		if (! srcTileObj.proto) {
+			srcTileObj.visible = false;
 			this.setState({tiles: [...this.state.tiles]});  // so src tile goes invisible
 		}
 		
 		this.setState({
-			sourceTileObj: tileObj, 
-			ghostX: ev.clientX - innerX, 
-			ghostY: ev.clientY - innerY, 
-			ghostTileObj: newTileObj(tileObj.type, 0, 0, true),
-			innerX, innerY, proto,
+			sourceTileObj: srcTileObj, 
+			ghostTileObj: this.newGhostObj(srcTileObj, ev, innerX, innerY) ,
+			innerX, innerY,
 		});
 	}
 	
@@ -85,15 +97,17 @@ console.info("render edit start");////
 	mouseMoveEvt(ev) {
 		if (! this.state.sourceTileObj)
 			return;
-		
-		this.setState({ghostX: ev.clientX - this.state.innerX, ghostY: ev.clientY - this.state.innerY, });
+		this.setState({
+			ghostTileObj: this.newGhostObj(this.state.sourceTileObj, ev) ,
+		});
 	}
 	
 	// the end of a drag, however
 	mouseUpEvt(ev) {
 		let s = this.state;
-		let st = s.sourceTileObj;
-		if (! st)
+		let sto = s.sourceTileObj;
+		let gto = s.ghostTileObj;
+		if (! sto)
 			return;
 		
 		// the mouse down location counts, too!
@@ -101,25 +115,28 @@ console.info("render edit start");////
 		
 		// now move it or clone it
 		let newTiles = [...s.tiles];
-		st.visible = true;
 		
-		let tileObj = st;
-		if (this.state.proto) {
+		if (sto.proto) {
 			// it's from the TileBar!  make a new one
-			tileObj = newTileObj(st.type, s.ghostX, s.ghostY, true);
-			newTiles.push(tileObj);
+			newTiles.push(newTileObj(sto.type, gto.x, gto.y, true));
 		}
 		else {
-			// an existing one
-			tileObj.x = s.ghostX;
-			tileObj.y = s.ghostY;
+			// an existing one, that's been sitting there, hidden.  Set new coords and make it visible.
+			let newObj = sto.clone();
+			newObj.x = gto.x;
+			newObj.y = gto.y;
+			newObj.visible = true;
+
+			let ix = newTiles.indexOf(sto);
+			newTiles[ix] = newObj;
 		}
 		
+		// end of dragging
 		this.setState({
 			sourceTileObj: null,
 			tiles: newTiles,
-			ghostTileObj: newTileObj(st.type, 0, 0, false),
-		});  // end of dragging
+			ghostTileObj: newDummyGhostTile(),
+		});
 	}
 
 	// cancel it if user drags out of the editor
@@ -129,7 +146,7 @@ console.info("render edit start");////
 		
 		// just kill it
 		this.state.sourceTileObj.visible = true;
-		this.setState({sourceTileObj: null});
+		this.setState({sourceTileObj: null, ghostTileObj: newDummyGhostTile()});
 	}
 	
 	

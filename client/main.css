@@ -22,23 +22,27 @@ svg#editor {
 	color: white
 }
 
-#editor g.begin {
+#editor .begin {
 	stroke: #484;
 	fill: #ac4;
 }
 
-#editor g.statement {
+#editor .statement {
 	stroke: #448;
 	fill: #5bd;
 }
 
-#editor g.conditional {
+#editor .conditional {
 	stroke: #844;
 	fill: #db6;
 }
 
-#editor g.end {
+#editor .end {
 	stroke: #844;
 	fill: #d66;
 }
 
+.arrow {
+	stroke: #f08;
+	stroke-width: 5px;
+}

@@ -49,6 +49,14 @@ export class tileObj {
 	render() {
 		throw "cannot render undefined tile type";
 	}
+	
+	// make new identical tileObj from old
+	clone() {
+		let cl = newTileObj(this.type, this.x, this.y, this.visible);
+		cl.inlets = this.inlets;
+		cl.outlets = this.outlets;
+		return cl;
+	}
 }
 
 class beginTileObj extends tileObj {
@@ -57,15 +65,16 @@ class beginTileObj extends tileObj {
 		this.outlets = [new arrowObj(this, 0, [1,0])];
 	}
 
-	render(mouseDownEvt) {
-		let arrows = null;
-		if (! this.proto)
-			arrows = <Arrow arrowObj={this.outlets[0]} />;
+	render(mouseDownEvt, visibility, arrowVisibility) {
+		// I used to wrap these in <g elements but the arrow calculations made that confusing
+		// cuz arrows started in one <g and ended in a different <g.
+		// So everything is in Editor-relative coords.
 		return <>
-			<ellipse cx={w12} cy={h12} 
+			<ellipse className='begin'  serial={'t'+ this.tileSerial} key={'t'+ this.tileSerial} 
+					cx={this.x} cy={this.y} 
 					rx={w12} ry={h12}
-					onMouseDown={mouseDownEvt}  />
-			{arrows}
+					onMouseDown={mouseDownEvt} style={{visibility}}  />
+			<Arrow arrowObj={this.outlets[0]} visibility={arrowVisibility} />
 		</>;
 	}
 	
@@ -82,10 +91,11 @@ class endTileObj extends tileObj {
 		this.outlets = [];  // no outlets, this is the end state
 	}
 
-	render(mouseDownEvt) {
-		return <ellipse cx={w12} cy={h12} 
-			rx={w12} ry={h12}
-			onMouseDown={mouseDownEvt}  />
+	render(mouseDownEvt, visibility, arrowVisibility) {
+		return <ellipse className='end'  serial={'t'+ this.tileSerial} key={'t'+ this.tileSerial} 
+				cx={this.x} cy={this.y} 
+				rx={w12} ry={h12}
+				onMouseDown={mouseDownEvt} style={{visibility}} />
 	}
 	
 	getInletLoc(inletNum) {
@@ -99,14 +109,12 @@ class statementTileObj extends tileObj {
 		this.outlets = [new arrowObj(this, 0, [0,1])];
 	}
 
-	render(mouseDownEvt) {
-		let arrows = null;
-		if (! this.proto)
-			arrows = <Arrow arrowObj={this.outlets[0]} />;
+	render(mouseDownEvt, visibility, arrowVisibility) {
 		return <>
-			<rect x='0' y='0' width={config.tileWidth} height={config.tileHeight} 
-					onMouseDown={mouseDownEvt}  />
-			{arrows}
+			<rect className='statement'  serial={'t'+ this.tileSerial} key={'t'+ this.tileSerial} 
+					x={this.x - w12} y={this.y - h12} width={w1} height={h1} 
+					onMouseDown={mouseDownEvt} style={{visibility}} />
+			<Arrow arrowObj={this.outlets[0]} visibility={arrowVisibility} />
 		</>;
 	}
 	
@@ -127,19 +135,16 @@ class conditionalTileObj extends tileObj {
 		this.outlets = [new arrowObj(this, 0, [-1,0]), new arrowObj(this, 1, [1,0])];
 	}
 
-	render(mouseDownEvt) {
-		let corners = `0,${h12} ${w12},0 ${w1},${h12} ${w12},${h1}`;
-		let arrows = null;
-		if (! this.proto) {
-			arrows = <>
-				<Arrow arrowObj={this.outlets[0]} />
-				<Arrow arrowObj={this.outlets[1]} />
-			</>;
-		}
+	render(mouseDownEvt, visibility, arrowVisibility) {
+		let x = this.x, y = this.y;
+		// starting at the top...
+		let corners = `${x},${y-h12} ${x+w12},${y} ${x},${y+h12} ${x-w12},${y}`;
 		return <>
-			<polygon points={corners} 
-					onMouseDown={mouseDownEvt} />
-			{arrows}
+			<polygon className='conditional' serial={'t'+ this.tileSerial} key={'t'+ this.tileSerial} 
+					points={corners} 
+					onMouseDown={mouseDownEvt} style={{visibility}} />
+			<Arrow arrowObj={this.outlets[0]} visibility={arrowVisibility} />
+			<Arrow arrowObj={this.outlets[1]} visibility={arrowVisibility} />
 		</>;
 	}
 
@@ -150,7 +155,7 @@ class conditionalTileObj extends tileObj {
 	getOutletLoc(outletNum) {
 		if (outletNum < 0 || outletNum >= 2)
 			throw "bad outlet for conditional tile";
-		return [this.x + outletNum * w1, this.y];
+		return [this.x - w12 + outletNum * w1, this.y];
 	}
 }
 
@@ -174,18 +179,15 @@ class Tile extends Component {
 		let p = this.props;
 		console.info("render tile %s %o", p.tileObj.proto ? 'proto' : '', p.tileObj);////
 		let tob = p.tileObj;
-		let x = p.x || tob.x;
-		let y = p.y || tob.y;
+////		let x = p.x || tob.x;
+////		let y = p.y || tob.y;
 		
 		// the x and y passed in  are for the center of the tile, not any corner
-		let txform = `translate(${x - w12},${y - h12})`
+		////let txform = `translate(${x - w12},${y - h12})`
 		let visibility = tob.visible ? 'visible' : 'hidden';
-		
-		return <g className={tob.type} transform={txform} 
-					serial={tob.tileSerial} key={tob.tileSerial}
-					style={{visibility}} >
-			{this.props.tileObj.render(this.mouseDownEvt)}
-		</g>;
+		let arrowVisibility = (tob.proto || tob.ghost) ? 'hidden' : visibility;
+
+		return tob.render(this.mouseDownEvt, visibility, arrowVisibility);
 	}
 
 
@@ -194,14 +196,11 @@ class Tile extends Component {
 	
 	// the other mouse events are handled at the Editor layer.  Including most of mousedown anyway.
 	mouseDownEvt(ev) {
-		let tob = this.props.tileObj;
-		
 		// the callback needs x and y of the click, relative to the center of the tile
 		let bounds = ev.currentTarget.getBoundingClientRect();
-		this.props.mouseDownCallback(this, tob, ev, 
+		this.props.mouseDownCallback(this, this.props.tileObj, ev, 
 			ev.clientX - (bounds.left + bounds.right) / 2, 
-			ev.clientY - (bounds.top + bounds.bottom) / 2, 
-			this.props.proto);
+			ev.clientY - (bounds.top + bounds.bottom) / 2);
 	}
 
 }
