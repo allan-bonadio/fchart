@@ -16,9 +16,9 @@ function initialData() {
 	// just for testing
 	iTiles = [
 		newTileObj('begin', 200, 100, true),
-		newTileObj('conditional', 400, 100, true),
-		newTileObj('statement', 200, 300, true),
-		newTileObj('end', 300, 300, true),
+	newTileObj('conditional', 400, 100, true),
+	newTileObj('statement', 200, 300, true),
+	newTileObj('end', 300, 300, true),
 	];
 	
 	// but must be indexed obj
@@ -88,7 +88,7 @@ class Editor extends Component {
 					refX="0" refY="1.5" 
 					markerWidth="4" markerHeight="3"
 					orient="auto">
-					<path d="M 0 0 L 4 1.5 L 0 3 z" stroke='none' fill='black' />
+					<path d="M 0 0 L 4 1.5 L 0 3 z" stroke='none' fill='#888' />
 				</marker>
 			</defs>
 			<TileBar mouseDownCallback={this.mouseDownCallback} />
@@ -102,27 +102,38 @@ class Editor extends Component {
 
 
 	/* ************************************************************ dragging tiles */
+	//	regenerated upon mousedown & on every move
 	newGhostObj(srcTileObj, ev, innerX = this.state.innerX, innerY = this.state.innerY) {
 		let nto = newTileObj(srcTileObj.type, 
 				ev.clientX - innerX, 
 				ev.clientY - innerY, 
 				true, false, true);
+		
+		// share the arrows with the src
+		// must recreate inlets/outlets so they follow ghost
+		nto.inlets = srcTileObj.inlets.map(inlet => inlet.cloneForGhost(this.state.ghostTileObj));
+		nto.outlets = srcTileObj.outlets.map(outlet => outlet.cloneForGhost(this.state.ghostTileObj));
+		console.log("newGhostObj from %o to %o", srcTileObj, nto);
+
 		return nto;
 	}
 	
 	// user has clicked down on a tile (whether in the TileBar or Flowchart)
 	// actually called from clicked tile.  innerXY are coordinates of clickdown relative to center of tile.
 	mouseDownCallback(tileComp, srcTileObj, ev, innerX, innerY) {
+		console.log("mouseDownCallback from src:%d,%d", srcTileObj.x, srcTileObj.y, srcTileObj);
 		let tileObjs = this.state.tileObjs;
 		if (! srcTileObj.proto) {
 			srcTileObj.visible = false;
 			tileObjs = {...tileObjs, [srcTileObj.tileSerial]: srcTileObj};  // so src tile goes invisible
 		}
 		
+		let ghost = this.newGhostObj(srcTileObj, ev, innerX, innerY);
+		console.log("    ghost @%d,%d", ghost.x, ghost.y, ghost);
 		this.setState({
 			tileObjs,
 			sourceTileObj: srcTileObj, 
-			ghostTileObj: this.newGhostObj(srcTileObj, ev, innerX, innerY) ,
+			ghostTileObj: ghost ,
 			innerX, innerY,
 		});
 	}
@@ -131,8 +142,10 @@ class Editor extends Component {
 	mouseMoveEvt(ev) {
 		if (! this.state.sourceTileObj)
 			return;
+		let ghost = this.newGhostObj(this.state.sourceTileObj, ev);
+		console.log("    ghost @%d,%d", ghost.x, ghost.y, ghost);
 		this.setState({
-			ghostTileObj: this.newGhostObj(this.state.sourceTileObj, ev) ,
+			ghostTileObj: ghost ,
 		});
 	}
 	
@@ -143,6 +156,7 @@ class Editor extends Component {
 		let gto = s.ghostTileObj;
 		if (! sto)
 			return;
+		console.log("    end ghost @%d,%d", gto.x, gto.y, gto);
 		
 ////		// the mouse down location counts, too!
 ////		this.mouseMoveEvt(ev);
@@ -152,17 +166,18 @@ class Editor extends Component {
 		
 		if (sto.proto) {
 			// it's from the TileBar!  make a new one
-			newTileObj(sto.type, gto.x, gto.y, true).add();
+			sto = newTileObj(sto.type, gto.x, gto.y, true).add();
 		}
 		else {
 			// an existing one, that's been sitting there, hidden.  Set new coords and make it visible.
-			let newObj = sto.clone();
-			newObj.x = gto.x;
-			newObj.y = gto.y;
-			newObj.visible = true;
+			sto = sto.cloneAt(gto.x, gto.y);
+			sto.visible = true;
 
-			this.setState({tileObjs: {...s.tileObjs, [newObj.tileSerial]: newObj}});
+			// replace old sto with new one
+			this.setState({tileObjs: {...s.tileObjs, [sto.tileSerial]: sto}});
 		}
+		console.log("end drag ghost@%d,%d %s", gto.x, gto.y, gto.visible ? 'vis' : 'hid', gto);
+		console.log("        src@%d,%d %s", sto.x, sto.y, sto, sto.visible ? 'vis' : 'hid', sto);
 		
 		// end of dragging
 		this.setState({
@@ -181,18 +196,14 @@ class Editor extends Component {
 		this.setState({sourceTileObj: null, ghostTileObj: newDummyGhostTile()});
 	}
 	
-	
-		
+	/* ****************************************************** lookups */
 	static lookupTileObj(serial) {
 		return Editor.me.state.tileObjs[serial];
 	}
 
-	
 	static lookupArrowObj(serial) {
 		return Editor.me.state.arrows[serial];
 	}
-
-
 }
 
 export default Editor;

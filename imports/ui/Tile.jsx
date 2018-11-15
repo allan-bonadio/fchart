@@ -36,7 +36,7 @@ export class tileObj {
 		else
 			this.tileSerial =  't'+ tileSerial++;
 		
-		this.inlets = [];  // no arrows pointing in yet
+		this.inlets = [];  // no arrows pointing in yet.  Outlets handled by subclass.
 	}
 	
 	// call to add tileObj to the flowchart list.  Not for ghosts or protos.
@@ -45,10 +45,12 @@ export class tileObj {
 		return this;  // chain it!
 	}
 	
+	// abstract method
 	getInletLoc() {
 		throw "no tile inlets";
 	}
 	
+	// abstract method
 	getOutletLoc() {
 		throw "no tile outlets";
 	}
@@ -58,21 +60,26 @@ export class tileObj {
 	}
 	
 	// render however many arrows; pass me tileObj.outlets
+	// used for all tileObj types
 	renderArrows(outlets) {
 		return outlets.map(arrow => 
 			<Arrow arrowObj={arrow}/>
 		);
 	}
 	
-	// make new identical tileObj from old, different obj so react notices
-	clone() {
-		let cl = newTileObj(this.type, this.x, this.y, this.visible, this.proto, this.ghost);
-		cl.inlets = this.inlets;
-		cl.outlets = this.outlets;
+	// make new identical flowchart tileObj from old, different obj so react notices
+	// do not use on ghosts or protos
+	cloneAt(newX, newY) {
+		let cl = newTileObj(this.type, newX, newY, this.visible, false, true);
+		cl.tileSerial = this.tileSerial;  // was ghost cuz we tricked it
+		cl.inlets = this.inlets////.map(inlet => inlet.clone());
+		cl.outlets = this.outlets////.map(outlet => outlet.clone());
+		console.log("    cloning %o to %o", this, cl);
 		return cl;
 	}
 }
 
+// for the Begin oval
 class beginTileObj extends tileObj {
 	constructor(args) {
 		super(args);
@@ -103,6 +110,7 @@ class beginTileObj extends tileObj {
 	}
 }
 
+// for the End oval
 class endTileObj extends tileObj {
 	constructor(args) {
 		super(args);
@@ -123,6 +131,7 @@ class endTileObj extends tileObj {
 	}
 }
 
+// for the Statement rectangle
 class statementTileObj extends tileObj {
 	constructor(args) {
 		super(args);
@@ -153,6 +162,7 @@ class statementTileObj extends tileObj {
 	}
 }
 
+// for the Conditional diamond shape
 class conditionalTileObj extends tileObj {
 	constructor(args) {
 		super(args);
@@ -204,7 +214,9 @@ class Tile extends Component {
 	
 	render() {
 		let p = this.props;
-		console.info("render tile %s %o", p.tileObj.proto ? 'proto' : '', p.tileObj);////
+		console.info("render tile %s %o", 
+				p.tileObj.proto ? 'proto' : p.tileObj.ghost ? 'ghost' : p.tileObj.tileSerial, 
+				p.tileObj);////
 		let tob = p.tileObj;
 ////		let x = p.x || tob.x;
 ////		let y = p.y || tob.y;
