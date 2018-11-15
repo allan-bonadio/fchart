@@ -10,7 +10,6 @@ const config = {
 	tileWidth: 80,
 	tileHeight: 40,
 	
-	// arrows.  The direction can be any 360.
 }
 
 export default config;

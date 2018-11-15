@@ -4,7 +4,7 @@ import React, { Component } from 'react';
 
 import config from './config';
 import Arrow, {arrowObj} from './Arrow';
-
+import Editor from './Editor';
 
 // we'll need these doing the geometry
 let w1 = config.tileWidth, h1 = config.tileHeight;
@@ -17,7 +17,7 @@ let tileSerial = 0;
 /* ************************************************************************ tile object */
 // this is the obj form of a tile, saved in the tiles list in the state
 // do not confuse the tileObj, here, with the Tile component, and the nodes inside
-export function newTileObj(type, x, y, visible = true) {
+export function newTileObj(type, x, y, visible = true, proto = false, ghost = false) {
 	let th;
 	switch (type) {
 	case 'begin': return new beginTileObj(arguments);
@@ -30,12 +30,19 @@ export function newTileObj(type, x, y, visible = true) {
 
 export class tileObj {
 	constructor(args) {
-		[this.type, this.x, this.y, this.visible] = args;
-		this.tileSerial =  tileSerial++;
-		if (this.visible === undefined)
-			this.visible = true;
+		[this.type, this.x, this.y, this.visible, this.proto, this.ghost] = args;
+		if (this.ghost)
+			this.tileSerial = 'ghost';  // constantly created and destroyed; don't spend all your serials
+		else
+			this.tileSerial =  't'+ tileSerial++;
 		
 		this.inlets = [];  // no arrows pointing in yet
+	}
+	
+	// call to add tileObj to the flowchart list.  Not for ghosts or protos.
+	add() {
+		Editor.addTile(this);
+		return this;  // chain it!
 	}
 	
 	getInletLoc() {
@@ -50,9 +57,16 @@ export class tileObj {
 		throw "cannot render undefined tile type";
 	}
 	
-	// make new identical tileObj from old
+	// render however many arrows; pass me tileObj.outlets
+	renderArrows(outlets) {
+		return outlets.map(arrow => 
+			<Arrow arrowObj={arrow}/>
+		);
+	}
+	
+	// make new identical tileObj from old, different obj so react notices
 	clone() {
-		let cl = newTileObj(this.type, this.x, this.y, this.visible);
+		let cl = newTileObj(this.type, this.x, this.y, this.visible, this.proto, this.ghost);
 		cl.inlets = this.inlets;
 		cl.outlets = this.outlets;
 		return cl;
@@ -62,19 +76,23 @@ export class tileObj {
 class beginTileObj extends tileObj {
 	constructor(args) {
 		super(args);
-		this.outlets = [new arrowObj(this, 0, [1,0])];
+		if (this.ghost || this.proto)
+			this.outlets = [];
+		else
+			this.outlets = [new arrowObj(this, 0, [1,0])];
 	}
 
-	render(mouseDownEvt, visibility, arrowVisibility) {
+	render(mouseDownEvt, visibility) {
 		// I used to wrap these in <g elements but the arrow calculations made that confusing
 		// cuz arrows started in one <g and ended in a different <g.
 		// So everything is in Editor-relative coords.
 		return <>
-			<ellipse className='begin'  serial={'t'+ this.tileSerial} key={'t'+ this.tileSerial} 
+			<ellipse className='begin'  
+					serial={this.tileSerial} key={this.tileSerial} 
 					cx={this.x} cy={this.y} 
 					rx={w12} ry={h12}
 					onMouseDown={mouseDownEvt} style={{visibility}}  />
-			<Arrow arrowObj={this.outlets[0]} visibility={arrowVisibility} />
+			{super.renderArrows(this.outlets)}
 		</>;
 	}
 	
@@ -91,11 +109,13 @@ class endTileObj extends tileObj {
 		this.outlets = [];  // no outlets, this is the end state
 	}
 
-	render(mouseDownEvt, visibility, arrowVisibility) {
-		return <ellipse className='end'  serial={'t'+ this.tileSerial} key={'t'+ this.tileSerial} 
+	render(mouseDownEvt, visibility) {
+		return <ellipse className='end'  
+				serial={this.tileSerial} key={this.tileSerial} 
 				cx={this.x} cy={this.y} 
 				rx={w12} ry={h12}
-				onMouseDown={mouseDownEvt} style={{visibility}} />
+				onMouseDown={mouseDownEvt} style={{visibility}} />;
+		// has no outlets
 	}
 	
 	getInletLoc(inletNum) {
@@ -106,15 +126,19 @@ class endTileObj extends tileObj {
 class statementTileObj extends tileObj {
 	constructor(args) {
 		super(args);
-		this.outlets = [new arrowObj(this, 0, [0,1])];
+		if (this.ghost || this.proto)
+			this.outlets = [];
+		else
+			this.outlets = [new arrowObj(this, 0, [0,1])];
 	}
 
-	render(mouseDownEvt, visibility, arrowVisibility) {
+	render(mouseDownEvt, visibility) {
 		return <>
-			<rect className='statement'  serial={'t'+ this.tileSerial} key={'t'+ this.tileSerial} 
+			<rect className='statement'  
+					serial={this.tileSerial} key={this.tileSerial} 
 					x={this.x - w12} y={this.y - h12} width={w1} height={h1} 
 					onMouseDown={mouseDownEvt} style={{visibility}} />
-			<Arrow arrowObj={this.outlets[0]} visibility={arrowVisibility} />
+			{super.renderArrows(this.outlets)}
 		</>;
 	}
 	
@@ -132,19 +156,22 @@ class statementTileObj extends tileObj {
 class conditionalTileObj extends tileObj {
 	constructor(args) {
 		super(args);
-		this.outlets = [new arrowObj(this, 0, [-1,0]), new arrowObj(this, 1, [1,0])];
+		if (this.ghost || this.proto)
+			this.outlets = [];
+		else
+			this.outlets = [new arrowObj(this, 0, [-1,0]), new arrowObj(this, 1, [1,0])];
 	}
 
-	render(mouseDownEvt, visibility, arrowVisibility) {
+	render(mouseDownEvt, visibility) {
 		let x = this.x, y = this.y;
 		// starting at the top...
 		let corners = `${x},${y-h12} ${x+w12},${y} ${x},${y+h12} ${x-w12},${y}`;
 		return <>
-			<polygon className='conditional' serial={'t'+ this.tileSerial} key={'t'+ this.tileSerial} 
+			<polygon className='conditional' 
+					serial={this.tileSerial} key={this.tileSerial} 
 					points={corners} 
 					onMouseDown={mouseDownEvt} style={{visibility}} />
-			<Arrow arrowObj={this.outlets[0]} visibility={arrowVisibility} />
-			<Arrow arrowObj={this.outlets[1]} visibility={arrowVisibility} />
+			{super.renderArrows(this.outlets)}
 		</>;
 	}
 
@@ -185,9 +212,8 @@ class Tile extends Component {
 		// the x and y passed in  are for the center of the tile, not any corner
 		////let txform = `translate(${x - w12},${y - h12})`
 		let visibility = tob.visible ? 'visible' : 'hidden';
-		let arrowVisibility = (tob.proto || tob.ghost) ? 'hidden' : visibility;
 
-		return tob.render(this.mouseDownEvt, visibility, arrowVisibility);
+		return tob.render(this.mouseDownEvt, visibility);
 	}
 
 

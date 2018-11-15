@@ -6,8 +6,25 @@ import Arrow, {arrowObj} from './Arrow';
 import TileBar from './TileBar';
 import Flowchart from './Flowchart.jsx';
 
+// not visible.  
 function newDummyGhostTile() {
-	return newTileObj('begin', 0,  0, false);
+	return newTileObj('begin', 0,  0, false, false, true);
+}
+
+// create the initial tileObjs upon startup.  Pass in the Editor instance.
+function initialData() {
+	// just for testing
+	iTiles = [
+		newTileObj('begin', 200, 100, true),
+		newTileObj('conditional', 400, 100, true),
+		newTileObj('statement', 200, 300, true),
+		newTileObj('end', 300, 300, true),
+	];
+	
+	// but must be indexed obj
+	let tilesStart = {};
+	iTiles.forEach(tileObj => tilesStart[tileObj.tileSerial] = tileObj);
+	return tilesStart;
 }
 
 // the main editing space for constructing a flowchart, including TileBar
@@ -17,18 +34,14 @@ class Editor extends Component {
 		Editor.me = this;
 		
 		this.state = {
-			tiles: [
-				// just for testing
-				newTileObj('begin', 200, 100), 
-				newTileObj('conditional', 400, 100), 
-				newTileObj('statement', 200, 300), 
-				newTileObj('end', 300, 300),
-			],
+			// indexed by serial number but not necessarily consecutive
+			tileObjs: initialData(),
 			
 			// non-null iff dragging
 			sourceTileObj: null,  // where the mousedown was, won't move during drag
 			
-			//  invisible unless dragging; follows the mouse.  Just a dummy when not dragging.
+			//  invisible unless dragging; follows the mouse.  
+			// Just a dummy when not dragging.
 			ghostTileObj: newDummyGhostTile(),
 		};
 		
@@ -38,13 +51,33 @@ class Editor extends Component {
 		this.mouseLeaveEvt = this.mouseLeaveEvt.bind(this);
 	}
 	
+	// append this tile onto the list.  called from tileObj.add()
+	// this is idempotent as you'll just be replacing the same slot at tileSerial
+	// except it'll replicate the table for react to notice.
+	// DOn't call this multiple times in the same event loop!  it'll toss away all but the last.
+	static addTile(tileObj) {
+		let th = Editor.me;
+		let newState = {...th.state, tileObjs: {...th.state.tileObjs, [tileObj.tileSerial]: tileObj}};
+		Editor.me.setState(newState);
+	}
+	
+	static getTileObj(serial) {
+		return Editor.me.state.tileObjs[serial];
+	}
+	
 	render() {
-console.info("------------------------------------------------------------- render edit start");////
-		let tileComps = this.state.tiles.map(tileObj => 
-			<Tile tileObj={tileObj} whHare='poiuytfuio'
-				mouseDownCallback={this.mouseDownCallback} key={tileObj.tileSerial} />
-		);
-		let src = this.state.sourceTileObj;
+		console.info("------------------------------------------------------------- render edit start");////
+
+		// given the tile set, make an array of the tile components
+		let tileObjs = this.state.tileObjs;
+		let tileComps = [];
+		for (let serial in tileObjs) {
+			let tob = tileObjs[serial];
+			tileComps.push(<Tile tileObj={tob} 
+					mouseDownCallback={this.mouseDownCallback} 
+					key={tob.tileSerial} serial={tob.tileSerial} />);
+		}
+		console.log('tileObjs', tileObjs);////
 		
 		return <svg id='editor' width={config.editorWidth} height={config.editorHeight} 
 					onMouseMove={this.mouseMoveEvt} 
@@ -72,21 +105,22 @@ console.info("------------------------------------------------------------- rend
 	newGhostObj(srcTileObj, ev, innerX = this.state.innerX, innerY = this.state.innerY) {
 		let nto = newTileObj(srcTileObj.type, 
 				ev.clientX - innerX, 
-				ev.clientY - innerY, true);
-		nto.ghost = true;
-		nto.serial = 'ghost';
+				ev.clientY - innerY, 
+				true, false, true);
 		return nto;
 	}
 	
 	// user has clicked down on a tile (whether in the TileBar or Flowchart)
 	// actually called from clicked tile.  innerXY are coordinates of clickdown relative to center of tile.
 	mouseDownCallback(tileComp, srcTileObj, ev, innerX, innerY) {
+		let tileObjs = this.state.tileObjs;
 		if (! srcTileObj.proto) {
 			srcTileObj.visible = false;
-			this.setState({tiles: [...this.state.tiles]});  // so src tile goes invisible
+			tileObjs = {...tileObjs, [srcTileObj.tileSerial]: srcTileObj};  // so src tile goes invisible
 		}
 		
 		this.setState({
+			tileObjs,
 			sourceTileObj: srcTileObj, 
 			ghostTileObj: this.newGhostObj(srcTileObj, ev, innerX, innerY) ,
 			innerX, innerY,
@@ -110,15 +144,15 @@ console.info("------------------------------------------------------------- rend
 		if (! sto)
 			return;
 		
-		// the mouse down location counts, too!
-		this.mouseMoveEvt(ev);
+////		// the mouse down location counts, too!
+////		this.mouseMoveEvt(ev);
 		
-		// now move it or clone it
-		let newTiles = [...s.tiles];
+////		// now move it or clone it
+////		let newTiles = [...s.tileObjs];
 		
 		if (sto.proto) {
 			// it's from the TileBar!  make a new one
-			newTiles.push(newTileObj(sto.type, gto.x, gto.y, true));
+			newTileObj(sto.type, gto.x, gto.y, true).add();
 		}
 		else {
 			// an existing one, that's been sitting there, hidden.  Set new coords and make it visible.
@@ -127,14 +161,12 @@ console.info("------------------------------------------------------------- rend
 			newObj.y = gto.y;
 			newObj.visible = true;
 
-			let ix = newTiles.indexOf(sto);
-			newTiles[ix] = newObj;
+			this.setState({tileObjs: {...s.tileObjs, [newObj.tileSerial]: newObj}});
 		}
 		
 		// end of dragging
 		this.setState({
 			sourceTileObj: null,
-			tiles: newTiles,
 			ghostTileObj: newDummyGhostTile(),
 		});
 	}
@@ -152,7 +184,7 @@ console.info("------------------------------------------------------------- rend
 	
 		
 	static lookupTileObj(serial) {
-		return Editor.me.state.tiles[serial];
+		return Editor.me.state.tileObjs[serial];
 	}
 
 	

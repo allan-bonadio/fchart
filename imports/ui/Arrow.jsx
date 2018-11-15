@@ -26,7 +26,7 @@ export class arrowObj {
 	
 		this.toTileObj = null;
 		this.toTileInlet = -1;
-		
+		this.arrowSerial = 'a'+ fromTileObj.tileSerial +'_'+ fromTileOutlet;
 		// notice this has no coordinates - they all come from the tiles
 	}
 	
@@ -68,9 +68,9 @@ class Arrow extends Component {
 		let path = `M ${coords(start)} L ${coords(end)}`;
 		console.log("path=", path);////
 		
-		let key = 'a'+ fromTileObj.tileSerial +'_'+ ao.fromTileOutlet;
-		return <path className='arrow' d={path} key={key} serial={key}
-			marker-end="url(#arrow-head)" style={{visibility: this.props.visibility}} />;
+		return <path className='arrow' d={path} 
+			marker-end="url(#arrow-head)"
+			key={this.arrowSerial} serial={this.arrowSerial} />;
 	}
 
 
