@@ -30,7 +30,7 @@ class TileBar extends Component {
 	render() {
 		// unlike those in the flowchart, these have proto
 		let tiles = this.tileObjs.map(tob => <Tile tileObj={tob} proto key={tob.tileSerial}
-				mouseDownCallback={this.props.mouseDownCallback}  />);
+				downTileCallback={this.props.downTileCallback} />);
 
 		return <g className='tile-bar' >
 			<rect x='0' width={config.tileBarWidth} 

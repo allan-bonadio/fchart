@@ -61,19 +61,31 @@ export class tileObj {
 	
 	// render however many arrows; pass me tileObj.outlets
 	// used for all tileObj types
-	renderArrows(outlets) {
+	renderArrows(outlets, downArrowCallback) {
 		return outlets.map(arrow => 
-			<Arrow arrowObj={arrow}/>
+			<Arrow arrowObj={arrow} downArrowCallback={downArrowCallback} />
 		);
 	}
 	
 	// make new identical flowchart tileObj from old, different obj so react notices
-	// do not use on ghosts or protos
+	// do not use on ghosts or protos (?) used to make final tileObj upon mouseup
 	cloneAt(newX, newY) {
-		let cl = newTileObj(this.type, newX, newY, this.visible, false, true);
+		let cl = newTileObj(this.type, newX, newY, this.visible, false, false);
 		cl.tileSerial = this.tileSerial;  // was ghost cuz we tricked it
 		cl.inlets = this.inlets////.map(inlet => inlet.clone());
 		cl.outlets = this.outlets////.map(outlet => outlet.clone());
+		console.log("    cloning %o to %o", this, cl);
+		return cl;
+	}
+
+	// make new identical flowchart tileObj from old, different obj so react notices
+	// this is for replicating the tile during arrow dragging
+	cloneForArrow() {
+		let cl = newTileObj(this.type, this.x, this.y, this.visible, false, true);
+		cl.ghost = false;  // was ghost cuz we didn't want a new serial
+		cl.tileSerial = this.tileSerial;
+		cl.inlets = this.inlets.map(inlet => inlet.cloneForDragging(cl));
+		cl.outlets = this.outlets.map(outlet => outlet.cloneForDragging(cl));
 		console.log("    cloning %o to %o", this, cl);
 		return cl;
 	}
@@ -89,7 +101,7 @@ class beginTileObj extends tileObj {
 			this.outlets = [new arrowObj(this, 0, [1,0])];
 	}
 
-	render(mouseDownEvt, visibility) {
+	render(mouseDownEvt, visibility, downArrowCallback) {
 		// I used to wrap these in <g elements but the arrow calculations made that confusing
 		// cuz arrows started in one <g and ended in a different <g.
 		// So everything is in Editor-relative coords.
@@ -99,7 +111,7 @@ class beginTileObj extends tileObj {
 					cx={this.x} cy={this.y} 
 					rx={w12} ry={h12}
 					onMouseDown={mouseDownEvt} style={{visibility}}  />
-			{super.renderArrows(this.outlets)}
+			{super.renderArrows(this.outlets, downArrowCallback)}
 		</>;
 	}
 	
@@ -141,13 +153,13 @@ class statementTileObj extends tileObj {
 			this.outlets = [new arrowObj(this, 0, [0,1])];
 	}
 
-	render(mouseDownEvt, visibility) {
+	render(mouseDownEvt, visibility, downArrowCallback) {
 		return <>
 			<rect className='statement'  
 					serial={this.tileSerial} key={this.tileSerial} 
 					x={this.x - w12} y={this.y - h12} width={w1} height={h1} 
 					onMouseDown={mouseDownEvt} style={{visibility}} />
-			{super.renderArrows(this.outlets)}
+			{super.renderArrows(this.outlets, downArrowCallback)}
 		</>;
 	}
 	
@@ -172,7 +184,7 @@ class conditionalTileObj extends tileObj {
 			this.outlets = [new arrowObj(this, 0, [-1,0]), new arrowObj(this, 1, [1,0])];
 	}
 
-	render(mouseDownEvt, visibility) {
+	render(mouseDownEvt, visibility, downArrowCallback) {
 		let x = this.x, y = this.y;
 		// starting at the top...
 		let corners = `${x},${y-h12} ${x+w12},${y} ${x},${y+h12} ${x-w12},${y}`;
@@ -181,7 +193,7 @@ class conditionalTileObj extends tileObj {
 					serial={this.tileSerial} key={this.tileSerial} 
 					points={corners} 
 					onMouseDown={mouseDownEvt} style={{visibility}} />
-			{super.renderArrows(this.outlets)}
+			{super.renderArrows(this.outlets, downArrowCallback)}
 		</>;
 	}
 
@@ -214,9 +226,9 @@ class Tile extends Component {
 	
 	render() {
 		let p = this.props;
-		console.info("render tile %s %o", 
-				p.tileObj.proto ? 'proto' : p.tileObj.ghost ? 'ghost' : p.tileObj.tileSerial, 
-				p.tileObj);////
+////		console.info("render tile %s %o", 
+////				p.tileObj.proto ? 'proto' : p.tileObj.ghost ? 'ghost' : p.tileObj.tileSerial, 
+////				p.tileObj);////
 		let tob = p.tileObj;
 ////		let x = p.x || tob.x;
 ////		let y = p.y || tob.y;
@@ -225,7 +237,7 @@ class Tile extends Component {
 		////let txform = `translate(${x - w12},${y - h12})`
 		let visibility = tob.visible ? 'visible' : 'hidden';
 
-		return tob.render(this.mouseDownEvt, visibility);
+		return tob.render(this.mouseDownEvt, visibility, this.props.downArrowCallback);
 	}
 
 
@@ -236,7 +248,7 @@ class Tile extends Component {
 	mouseDownEvt(ev) {
 		// the callback needs x and y of the click, relative to the center of the tile
 		let bounds = ev.currentTarget.getBoundingClientRect();
-		this.props.mouseDownCallback(this, this.props.tileObj, ev, 
+		this.props.downTileCallback(this, this.props.tileObj, ev, 
 			ev.clientX - (bounds.left + bounds.right) / 2, 
 			ev.clientY - (bounds.top + bounds.bottom) / 2);
 	}

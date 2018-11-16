@@ -43,9 +43,13 @@ class Editor extends Component {
 			//  invisible unless dragging; follows the mouse.  
 			// Just a dummy when not dragging.
 			ghostTileObj: newDummyGhostTile(),
+			
+			// arrow object whose head we're dragging, or null if not
+			draggingArrowObj: null,
 		};
 		
-		this.mouseDownCallback = this.mouseDownCallback.bind(this);
+		this.downTileCallback = this.downTileCallback.bind(this);
+		this.downArrowCallback = this.downArrowCallback.bind(this);
 		this.mouseMoveEvt = this.mouseMoveEvt.bind(this);
 		this.mouseUpEvt = this.mouseUpEvt.bind(this);
 		this.mouseLeaveEvt = this.mouseLeaveEvt.bind(this);
@@ -74,10 +78,11 @@ class Editor extends Component {
 		for (let serial in tileObjs) {
 			let tob = tileObjs[serial];
 			tileComps.push(<Tile tileObj={tob} 
-					mouseDownCallback={this.mouseDownCallback} 
+					downTileCallback={this.downTileCallback} 
+					downArrowCallback={this.downArrowCallback} 
 					key={tob.tileSerial} serial={tob.tileSerial} />);
 		}
-		console.log('tileObjs', tileObjs);////
+////		console.log('tileObjs', tileObjs);////
 		
 		return <svg id='editor' width={config.editorWidth} height={config.editorHeight} 
 					onMouseMove={this.mouseMoveEvt} 
@@ -85,18 +90,18 @@ class Editor extends Component {
 					onMouseLeave={this.mouseLeaveEvt}>
 			<defs>
 				<marker id="arrow-head"
-					refX="0" refY="1.5" 
+					refX="2.9" refY="1.5" 
 					markerWidth="4" markerHeight="3"
 					orient="auto">
 					<path d="M 0 0 L 4 1.5 L 0 3 z" stroke='none' fill='#888' />
 				</marker>
 			</defs>
-			<TileBar mouseDownCallback={this.mouseDownCallback} />
-			<Flowchart mouseDownCallback={this.mouseDownCallback}>
+			<TileBar downTileCallback={this.downTileCallback} />
+			<Flowchart downTileCallback={this.downTileCallback}>
 				{tileComps}
 			</Flowchart>
 			<Tile tileObj={this.state.ghostTileObj} ghost
-						mouseDownCallback={this.mouseDownCallback} />
+						downTileCallback={this.downTileCallback} />
 		</svg>;
 	}
 
@@ -113,15 +118,15 @@ class Editor extends Component {
 		// must recreate inlets/outlets so they follow ghost
 		nto.inlets = srcTileObj.inlets.map(inlet => inlet.cloneForGhost(this.state.ghostTileObj));
 		nto.outlets = srcTileObj.outlets.map(outlet => outlet.cloneForGhost(this.state.ghostTileObj));
-		console.log("newGhostObj from %o to %o", srcTileObj, nto);
+		////console.log("newGhostObj from %o to %o", srcTileObj, nto);
 
 		return nto;
 	}
 	
 	// user has clicked down on a tile (whether in the TileBar or Flowchart)
 	// actually called from clicked tile.  innerXY are coordinates of clickdown relative to center of tile.
-	mouseDownCallback(tileComp, srcTileObj, ev, innerX, innerY) {
-		console.log("mouseDownCallback from src:%d,%d", srcTileObj.x, srcTileObj.y, srcTileObj);
+	downTileCallback(tileComp, srcTileObj, ev, innerX, innerY) {
+		////console.log("downTileCallback from src:%d,%d", srcTileObj.x, srcTileObj.y, srcTileObj);
 		let tileObjs = this.state.tileObjs;
 		if (! srcTileObj.proto) {
 			srcTileObj.visible = false;
@@ -129,7 +134,7 @@ class Editor extends Component {
 		}
 		
 		let ghost = this.newGhostObj(srcTileObj, ev, innerX, innerY);
-		console.log("    ghost @%d,%d", ghost.x, ghost.y, ghost);
+		////console.log("    ghost @%d,%d", ghost.x, ghost.y, ghost);
 		this.setState({
 			tileObjs,
 			sourceTileObj: srcTileObj, 
@@ -138,52 +143,94 @@ class Editor extends Component {
 		});
 	}
 	
+	// user has clicked down on an arrowhead, in flowchart
+	// actually called from clicked Arrow.
+	downArrowCallback(arrowComp, arrowObj, ev) {
+		////console.log("downArrowCallback from src:%d,%d", arrowObj.x, arrowObj.y, arrowObj);
+		let fromTileObj = Editor.getTileObj(arrowObj.fromTileSerial);
+
+		// must recreate tileObjs array cuz arrows hang off of tileObjs
+		let tileObjs = this.state.tileObjs;
+		tileObjs = {...tileObjs, [arrowObj.fromTileSerial]: fromTileObj};  // so src tile goes invisible
+		
+		////console.log("    ghost @%d,%d", ghost.x, ghost.y, ghost);
+		this.setState({
+			tileObjs,
+			sourceTileObj: fromTileObj, 
+			draggingArrowObj: arrowObj,
+		});
+	}
+	
 	// a mouse move relevant to a drag
 	mouseMoveEvt(ev) {
-		if (! this.state.sourceTileObj)
+		let sto = this.state.sourceTileObj;
+		if (! sto)
 			return;
-		let ghost = this.newGhostObj(this.state.sourceTileObj, ev);
-		console.log("    ghost @%d,%d", ghost.x, ghost.y, ghost);
-		this.setState({
-			ghostTileObj: ghost ,
-		});
+		
+		if (! this.state.draggingArrowObj) {
+			// dragging tile
+			let ghost = this.newGhostObj(sto, ev);
+			this.setState({
+				ghostTileObj: ghost ,
+			});
+		}
+		else {
+			// dragging arrowhead, rooted at sto
+			sto = sto.cloneForArrow();
+			let newArrow = sto.outlets[this.state.draggingArrowObj.fromTileOutlet];
+			newArrow.dragX = ev.clientX;
+			newArrow.dragY = ev.clientY;
+////			sto.outlets[this.state.draggingArrowObj.fromTileOutlet] = newArrow;
+			this.setState({
+				draggingArrowObj: newArrow,
+				tileObjs: {...this.state.tileObjs, [sto.tileSerial]: sto},
+			});
+			
+			console.log("arrw drag ", sto.outlets[0].dragX, sto.outlets[0].dragY, );
+		}
 	}
 	
 	// the end of a drag, however
 	mouseUpEvt(ev) {
 		let s = this.state;
 		let sto = s.sourceTileObj;
-		let gto = s.ghostTileObj;
 		if (! sto)
 			return;
-		console.log("    end ghost @%d,%d", gto.x, gto.y, gto);
-		
-////		// the mouse down location counts, too!
-////		this.mouseMoveEvt(ev);
-		
-////		// now move it or clone it
-////		let newTiles = [...s.tileObjs];
-		
-		if (sto.proto) {
-			// it's from the TileBar!  make a new one
-			sto = newTileObj(sto.type, gto.x, gto.y, true).add();
+
+		if (! this.state.draggingArrowObj) {
+			// dragging a tile
+			if (sto.proto) {
+				// tile from the TileBar!  make a new one
+				sto = newTileObj(sto.type, gto.x, gto.y, true).add();
+			}
+			else {
+				// an existing tile, that's been sitting there, hidden.  Set new coords and make it visible.
+				sto = sto.cloneAt(gto.x, gto.y);
+				sto.visible = true;
+
+				// replace old sto with new one
+				this.setState({tileObjs: {...s.tileObjs, [sto.tileSerial]: sto}});
+			}
+			// end of dragging
+			this.setState({
+				sourceTileObj: null,
+				ghostTileObj: newDummyGhostTile(),
+			});
+			console.log("    end tile drag @%d,%d", sto.x, sto.y, sto);
 		}
 		else {
-			// an existing one, that's been sitting there, hidden.  Set new coords and make it visible.
-			sto = sto.cloneAt(gto.x, gto.y);
-			sto.visible = true;
-
-			// replace old sto with new one
-			this.setState({tileObjs: {...s.tileObjs, [sto.tileSerial]: sto}});
+			// dragging around an arrowhead
+			let dao = this.state.draggingArrowObj;
+			dao.dragging = false;
+			dao.dragX = null;
+			dao.dragY = null;
+			let state = {...this.state, draggingArrowObj: null, sourceTileObj: null};
+			this.setState(state);
+			console.log("    end arrow drag", dao);
 		}
-		console.log("end drag ghost@%d,%d %s", gto.x, gto.y, gto.visible ? 'vis' : 'hid', gto);
-		console.log("        src@%d,%d %s", sto.x, sto.y, sto, sto.visible ? 'vis' : 'hid', sto);
+		////console.log("end drag ghost@%d,%d %s", gto.x, gto.y, gto.visible ? 'vis' : 'hid', gto);
+		////console.log("        src@%d,%d %s", sto.x, sto.y, sto, sto.visible ? 'vis' : 'hid', sto);
 		
-		// end of dragging
-		this.setState({
-			sourceTileObj: null,
-			ghostTileObj: newDummyGhostTile(),
-		});
 	}
 
 	// cancel it if user drags out of the editor
@@ -193,7 +240,7 @@ class Editor extends Component {
 		
 		// just kill it
 		this.state.sourceTileObj.visible = true;
-		this.setState({sourceTileObj: null, ghostTileObj: newDummyGhostTile()});
+		this.setState({sourceTileObj: null, ghostTileObj: newDummyGhostTile(), draggingArrowObj: null,});
 	}
 	
 	/* ****************************************************** lookups */
